@@ -1,0 +1,100 @@
+clc;
+clear;
+%% 读入数据
+% Xs = [23,45,67,25;
+%       45,54,66,34;
+%       12,34,56,20;
+%       25,37,46,26];
+% Ys = [1,3,2];
+% Xt = [44,25,67;
+%       45,24,66;
+%       42,24,56;
+%       55,27,46];
+% [m,ns] = size(Xs);
+% [m,nt] = size(Xt);
+
+datapath = 'Bot_data/';
+str = {'5161', '6151', '5171', '7151', '6171', '7161'};
+id = 1;
+% id等于几，就加载第几个文件。datepath里面有5个文件
+load([datapath str{id}]);
+% NbRow=1476;
+% NbCol=256;
+% NbDim=145;
+% test_class=1:9;
+% C=9;
+Xs=ROI6_scale; %Xs = Xs';
+Ys=Label6; %Ys = Ys';
+Xt=ROI7_scale; %Xt = Xt';
+Yt=Label7;
+Xs_row=ROI6_row;     Xs_col=ROI6_col;
+Xt_row=ROI7_row;     Xt_col=ROI7_col;
+ns = 1580; nt = 1688;
+%% 整个图像做归一化，注意，5月数据如果是target，那么需要处理一下。
+if id==2 || id==4
+    img_t=reshape(IMG_target,size(IMG_target,1)*size(IMG_target,2),size(IMG_target,3));
+    img_t(:,1:46)=img_t(:,1:46)*0.4;
+    img_t(:,47:145)=img_t(:,47:145)*0.8;
+else
+   img_t=reshape(IMG_target,size(IMG_target,1)*size(IMG_target,2),size(IMG_target,3));
+end
+
+[img_t_norm,ps] = mapminmax('apply',img_t',ps);%
+img_t_norm=img_t_norm';
+for i=1:size(IMG_target,3)
+    IMG_target_norm(:,:,i)=reshape(img_t_norm(:,i),size(IMG_target,1),size(IMG_target,2));
+end
+%% 
+Xs = Xs';
+Ys = Ys';
+Xt = Xt';
+% 距离
+sum1 = 0; % 公式（2）的分母
+for i = 1:ns
+    for j = 1:nt
+        dij(i,j) = (norm(Xs(:,i)-Xt(:,j),2))^2; 
+        if i ~= j
+            sum1 = sum1 + exp(-dij(i,j));            
+        end
+    end
+end 
+% 条件概率(ns行nt列)
+for i = 1:ns
+    for j = 1:nt
+        pij(i,j) = exp(-dij(i,j))/sum1;
+    end
+end
+% 后验概率
+
+% ptc = sum(pij.*Ys, 2);
+Wwij = pij;
+%% 求a，最小化
+% 求Dwr(行)，Dwc(列) -- 对角矩阵
+Dwr_temp = sum(Wwij,2); % a行1列
+for i = 1:ns
+    Dwr(i,i) = Dwr_temp(i);
+end
+Dwc_temp = sum(Wwij); % 1行b列
+for j = 1:nt
+    Dwc(j,j) = Dwc_temp(j);
+end
+% 构造B,E
+B = (Xs*Dwr*Xs') + (Xt*Dwc*Xt');
+E = 2*Xs*Wwij*Xt';
+%% 广义特征值分解
+[V,D] = eig(E,B);
+A = D;
+
+%% 分类器分类
+% SVM的代码：
+% Xs，Ys是源域或者training数据和label
+% Xt，Yt是目标域数据或者test数据和其label
+% 第一行是求最优参数（惩罚因子C和RBF核函数的参数）
+% 第二行就是把参数组合成cmd，作为第三行训练svm的一个属于参数项。
+% 第三行是训练svm分类器，返回model，里面包括很多项，有兴趣的可以百度查，我在模式识别ppt里面也列出来了。
+% 第四行是对目标域数据分类，Yt0是分类结果（hard label，对每一个test数据点，给出其属于哪个类的类别信息），OA是分类精度，Pt0是soft label（对每个test数据点，给出其属于各个类的概率信息）
+
+[~,bestc,bestg] = SVMcgForClass_TL(Ys,Xs);    %求最优参数 
+cmd=['-t 2',' -g ' num2str(bestg), ' -c ' num2str(bestc)]; 
+model = svmtrain( Ys , Xs , [ '-c ' num2str(bestc) ' -g ' num2str(bestg) ' -b 1 ' ]);
+[ Yt0, OA , Pt0] = svmpredict( Yt, Xt, model ,' -b 1 ' );
