@@ -3,15 +3,15 @@ clc;
 clear;
 %% 读入数据
 datapath = 'Bot_data/';
-str = {'5161', '6151', '5171', '7151', '6171', '7161'};
-id = 5; % id等于几，就加载第几个文件。datepath里面有5个文件
+str = {'5161', '6151', '5171', '6171', '7151', '7161'};
+id = 4; % id等于几，就加载第几个文件。datepath里面有5个文件
 load([datapath str{id}]);
 Xs=ROI6_scale;
 Ys=Label6;
 Xt=ROI7_scale;
 Yt=Label7;
-Xs_row=ROI6_row;     Xs_col=ROI6_col;
-Xt_row=ROI7_row;     Xt_col=ROI7_col;
+% Xs_row=ROI6_row;     Xs_col=ROI6_col;
+% Xt_row=ROI7_row;     Xt_col=ROI7_col;
 [ns,~] = size(Xs); [nt,~] = size(Xt);
 %% 整个图像做归一化，注意，5月数据如果是target，那么需要处理一下。
 % if id==2 || id==4
@@ -38,10 +38,10 @@ Xt_row=ROI7_row;     Xt_col=ROI7_col;
 % ROI6_scale_new=Xs-repmat(d,size(Xs,1),1);
 % Xs=ROI6_scale_new;
 %% PGE
-for k = 1:5
+% for k = 1:5
     [Xsa,Xta] = PGE(Xs,Ys,Xt);
-
-% 分类器分类
+%     [Xsa,Xta] = PGE1(Xs,Ys,Xt);
+%% 分类器分类
 % SVM的代码：
 % Xs，Ys是源域或者training数据和label,Xt,Yt是目标域数据或者test数据和其label
 % 第一行是求最优参数（惩罚因子C和RBF核函数的参数）,第二行就是把参数组合成cmd,作为第三行训练svm的一个属于参数项。
@@ -57,7 +57,9 @@ for k = 1:5
 % cmd=['-t 2',' -g ' num2str(bestg), ' -c ' num2str(bestc)]; 
 % model = svmtrain( Ys , Xs , [ '-c ' num2str(bestc) ' -g ' num2str(bestg) ' -b 1 ' ]);
 % [ Yt0, OA, Pt0] = svmpredict( Yt, Xt, model ,' -b 1 ' );
-    Xs = Xsa';
-    Xt = Xsa';
-    
-end
+%     Xs = Xsa';
+%     Xt = Xsa';  
+% end
+
+%%
+plot_train_centroid(Xsa', Ys, Xta', Yt0, 9, 3, 6);
